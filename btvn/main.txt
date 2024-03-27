@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Category Page</title>
+	<!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+
+	<!-- jQuery library -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+	<!-- Popper JS -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+
+	<!-- Latest compiled JavaScript -->
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+
+	<script type="text/javascript" src = "js/config.js"></script>
+</head>
+<body>
+	<div class="container">
+		<table class="table table-bordered">
+			<thead>
+				<tr>
+					<th>No</th>
+					<th>Name</th>
+					<th>Updated At</th>
+					<th style="width: 50px;"></th>
+					<th style="width: 50px;"></th>
+				</tr>
+			</thead>
+			<tbody id="result"></tbody>
+		</table>
+	</div>
+
+	<script type="text/javascript">
+		$(function() {
+			$.post(BASE_URL + API_CATEGORY, {
+					'action': 'list',
+					's': ''
+			}, function(data) {
+				// console.log(data)
+				result = JSON.parse(data)
+				for(i=0;i<result.length;i++) {
+					$('#result').append(`<tr>
+							<td>${i+1}</td>
+							<td>${result[i].name}</td>
+							<td>${result[i].updated_at}</td>
+							<td><button class="btn btn-warning">Edit</button></td>
+							<td><button class="btn btn-danger" onclick="removeItem(${result[i].id})">Remove</button></td>
+						</tr>`)
+				}
+			})
+		})
+
+		function removeItem(id) {
+			var option = confirm('Ban co chac chan muon xoa danh muc nay khong?')
+			if(!option) return
+
+			$.post(BASE_URL + API_CATEGORY, {
+					'action': 'remove',
+					'id': id
+			}, function(data) {
+				// console.log(data)
+				location.reload()
+			})
+		}
+	</script>
+</body>
+</html>
