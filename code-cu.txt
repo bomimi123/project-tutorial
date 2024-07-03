@@ -1,0 +1,8 @@
+9:30:34
+
+trong folder frontend/pages:
+MyOrder , PlaceOrder, Verify
+
+
+cung cấp thông tin thêm folder backend:
+controllers , models, routes/
