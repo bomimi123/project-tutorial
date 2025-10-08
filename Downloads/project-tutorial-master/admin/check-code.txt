@@ -1,0 +1,119 @@
+Rất hợp lý! Giữ luồng chuẩn 5 trạng thái sẽ giúp em có quy trình quản lý đơn hàng chi tiết hơn, phân biệt rõ giữa việc giao hàng thành công (Delivered) và xác nhận tính toán doanh thu (Order Completed).
+
+Để làm được điều này, chúng ta cần:
+
+Cập nhật file Admin/src/pages/Order/Order.jsx để thêm trạng thái mới.
+
+Cập nhật file orderController.js trong Backend để xử lý đúng logic khi chuyển sang trạng thái "Order Completed".
+
+1. Admin Frontend: Cập nhật pages/Order/Order.jsx
+Em cần thêm <option> "Order Completed" vào dropdown trạng thái trong file Admin. Trạng thái này sẽ nằm sau "Delivered".
+
+JavaScript
+
+// Admin/src/pages/Order/Order.jsx (CẬP NHẬT)
+
+// ... (Các import và logic giữ nguyên) ...
+
+const Order = () => {
+    // ... (Các State, Context, và Hàm giữ nguyên) ...
+
+    return (
+        <div className='order add'>
+            <h3>Trang quản lý Đơn hàng</h3>
+            <div className="list-container">
+                {orders.map((order, index) => (
+                    <div key={index} className='order-item'>
+                        {/* ... (Các phần tử hiển thị chi tiết đơn hàng giữ nguyên) ... */}
+
+                        {/* Dropdown cập nhật trạng thái */}
+                        <select 
+                            onChange={(event) => statusHandler(event, order._id)} 
+                            value={order.status}
+                        >
+                            <option value="Food Processing">Food Processing</option>
+                            <option value="Out For Delivery">Out For Delivery</option>
+                            <option value="Delivered">Delivered</option> {/* Giữ lại Delivered */}
+                            
+                            {/* THÊM TRẠNG THÁI MỚI */}
+                            <option value="Order Completed">Order Completed</option> 
+                            
+                            <option value="Canceled">Canceled</option> 
+                        </select>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+export default Order;
+2. Backend: Cập nhật controllers/orderController.js
+Phần này đã đúng, chỉ cần xác nhận lại rằng logic kiểm tra trạng thái là "Order Completed" để kích hoạt việc tính toán Dashboard.
+
+File orderController.js mà chúng ta đã sửa trước đó (chèn logic gọi updateDashboardMetrics) đã đúng.
+
+JavaScript
+
+// backend/controllers/orderController.js (XÁC NHẬN)
+
+// ... (các import khác)
+import { updateDashboardMetrics } from "./dashboardController.js"; 
+
+// ... (các hàm khác)
+
+// api for upadting order status (updateStatus)
+const updateStatus = async (req, res) => {
+    try {
+        const { orderId, status } = req.body;
+        
+        // 1. Cập nhật trạng thái
+        await orderModel.findByIdAndUpdate(orderId, { status: status });
+
+        // 2. LOGIC KÍCH HOẠT TÍNH TOÁN METRICS
+        // CHỈ KÍCH HOẠT KHI TRẠNG THÁI CHUYỂN SANG "Order Completed"
+        if (status === "Order Completed") { 
+            await updateDashboardMetrics(); 
+            console.log(`Order ${orderId} completed. Dashboard metrics updated.`);
+        }
+
+        res.json({ success: true, message: "Status Updated" });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: "Error" });
+    }
+}
+
+export { placeOrder, verifyOrder, userOrders, listOrders, updateStatus };
+Hoàn tất
+Sau khi thực hiện các thay đổi trên:
+
+Admin có thể chuyển đơn hàng từ Delivered sang Order Completed.
+
+Khi Admin chọn Order Completed, Backend sẽ tự động kích hoạt hàm updateDashboardMetrics() để tính toán Tổng Doanh thu và Tổng Đơn hàng Hoàn thành.
+
+User sẽ thấy trạng thái Order Completed được highlight như chúng ta đã cấu hình trong MyOrder.jsx trước đó.
+
+Luồng 5 trạng thái đã được thiết lập thành công! Em đã sẵn sàng để kiểm tra lại toàn bộ chức năng! ✅
+
+
+
+
+
+
+
+
+
+
+
+
+Deep Research
+
+🍌 Hình ảnh
+
+Canvas
+
+Học có hướng dẫn
+
+Gemini có thể mắc sai sót, vì vậy, nhớ xác minh câu trả lời của Gemini.
+

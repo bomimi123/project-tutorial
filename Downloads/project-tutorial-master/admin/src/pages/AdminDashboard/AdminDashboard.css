@@ -1,0 +1,378 @@
+/*
+ * ---------------------------------------
+ * 1. LAYOUT VÀ STYLE CHUNG
+ * ---------------------------------------
+ */
+.admin-dashboard {
+    padding: 30px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f7f9fc; /* Nền nhẹ */
+    min-height: 100vh;
+    flex: 1;
+    width: 100%;
+}
+
+.dashboard-title {
+    text-align: left;
+    margin-bottom: 25px;
+    color: #2c3e50;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+/* CONTAINER CHÍNH */
+.dashboard-main-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 30px;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-main-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dashboard-section {
+    padding: 25px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease;
+    min-height: 350px;
+}
+
+.dashboard-section h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #4a5568;
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.dashboard-section h3 i {
+    margin-right: 10px;
+    color: #3498db;
+}
+
+.no-data {
+    color: #95a5a6;
+    text-align: center;
+    padding: 30px 0;
+}
+
+/*
+ * ---------------------------------------
+ * 2. TOP METRIC CARDS
+ * ---------------------------------------
+ */
+.metric-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.metric-card {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s;
+    color: #fff;
+    overflow: hidden;
+    position: relative;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+}
+
+.metric-card h4 {
+    font-size: 16px;
+    color: #555;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.metric-value {
+    font-size: 32px;
+    font-weight: 700;
+}
+
+/* Màu thẻ */
+.revenue-card {
+    background-color: #f0fff4;
+    color: #27ae60;
+}
+.revenue-card .metric-value {
+    color: #27ae60;
+}
+
+.order-card {
+    background-color: #e6f7ff;
+    color: #3498db;
+}
+.order-card .metric-value {
+    color: #3498db;
+}
+
+.session-card {
+    background-color: #fffbe6;
+    color: #f1c40f;
+}
+.session-card .metric-value {
+    color: #f1c40f;
+}
+
+/* Định dạng màu cho các thẻ mới */
+.metric-card.global-revenue-card {
+    border-left: 5px solid #27ae60;
+}
+.metric-card.global-revenue-card .metric-value {
+    color: #27ae60;
+}
+
+.metric-card.completed-orders-card {
+    border-left: 5px solid #3498db;
+}
+.metric-card.completed-orders-card .metric-value {
+    color: #3498db;
+}
+
+.metric-card.order-card {
+    border-left: 5px solid #e67e22;
+}
+.metric-card.order-card .metric-value {
+    color: #e67e22;
+}
+
+/*
+ * ---------------------------------------
+ * 3. TOP LISTS (Sản phẩm & Khách hàng)
+ * ---------------------------------------
+ */
+.top-list {
+    list-style: none;
+    padding: 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.top-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.top-list li:last-child {
+    border-bottom: none;
+}
+
+/* STYLE CHO SẢN PHẨM BÁN CHẠY */
+.product-list .product-rank {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: bold;
+    font-size: 14px;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.product-list .product-name {
+    flex-grow: 1;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.product-list .item-quantity {
+    font-weight: 600;
+    color: #27ae60;
+    font-size: 15px;
+}
+
+/* STYLE CHO KHÁCH HÀNG ORDER */
+.customer-list li {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.customer-list li > div:first-child {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 5px;
+}
+
+.customer-name {
+    font-weight: 600;
+    color: #8e44ad;
+    font-size: 16px;
+}
+
+.customer-email {
+    font-size: 13px;
+    color: #95a5a6;
+    font-style: italic;
+}
+
+.customer-metrics {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    font-size: 14px;
+    padding-top: 5px;
+}
+
+.customer-orders {
+    color: #3498db;
+    font-weight: 500;
+}
+
+.customer-spent {
+    font-weight: 600;
+    color: #2ecc71;
+}
+
+/*
+ * ---------------------------------------
+ * 4. BIỂU ĐỒ VÀ STATUS GRID
+ * ---------------------------------------
+ */
+.section-revenue, .section-order-status {
+    grid-column: span 2;
+}
+
+@media (max-width: 1024px) {
+    .section-revenue, .section-order-status {
+        grid-column: span 1;
+    }
+}
+
+.revenue-chart {
+    height: 350px;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.status-card {
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    background: #fff;
+    border: 1px solid #eee;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.status-card h4 {
+    margin: 0 0 5px;
+    font-size: 14px;
+    color: #95a5a6;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.status-card p {
+    margin: 0;
+    font-size: 24px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.total-card {
+    background: #34495e;
+    color: #fff;
+    grid-column: span 1;
+}
+
+.total-card h4, .total-card p {
+    color: #fff;
+}
+.total-card p {
+    color: #f1c40f;
+}
+
+.collapsible-header {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 0;
+}
+
+.collapse-icon {
+    transition: transform 0.3s ease;
+    font-size: 14px;
+}
+
+.expand-collapse-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 8px;
+    margin-top: 10px;
+    background-color: #f7f7f7;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+    transition: background-color 0.2s;
+}
+
+.expand-collapse-btn:hover {
+    background-color: #eee;
+}
+
+.expand-collapse-btn .collapse-icon {
+    margin-left: 8px;
+    font-size: 12px;
+}
+
+
+
+.top-list.product-list li {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+}
+
+.product-image {
+    width: 50px; /* Kích thước ảnh */
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 15px;
+}
+
+.product-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    margin-right: 15px;
+}
+
+.product-name {
+    font-weight: 600;
+}
+.product-price {
+    font-size: 13px;
+    color: #555;
+}

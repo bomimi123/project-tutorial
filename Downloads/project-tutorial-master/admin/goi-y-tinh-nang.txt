@@ -1,0 +1,156 @@
+
+chưa làm:
+
+
+3. Quản lý khuyến mãi & Mã giảm giá
+Đây là một chức năng quan trọng để thu hút và giữ chân khách hàng. Trang này sẽ cho phép bạn tạo, chỉnh sửa và quản lý các chương trình khuyến mãi một cách linh hoạt.
+
+Tạo mới: Khả năng tạo mã giảm giá với các thông tin như mã code, phần trăm/số tiền giảm, số lượng sử dụng và ngày hết hạn.
+
+Danh sách: Hiển thị danh sách các mã khuyến mãi đang hoạt động và đã hết hạn.
+
+Thống kê: Theo dõi hiệu quả của từng mã giảm giá.
+
+:
+chức năng mới
+. Quản lý khuyến mãi & Mã giảm giá
+Đây là một chức năng quan trọng để thu hút và giữ chân khách hàng. Trang này sẽ cho phép bạn tạo, chỉnh sửa và quản lý các chương trình khuyến mãi một cách linh hoạt.
+
+Tạo mới: Khả năng tạo mã giảm giá với các thông tin như mã code, phần trăm/số tiền giảm, số lượng sử dụng và ngày hết hạn.
+
+Danh sách: Hiển thị danh sách các mã khuyến mãi đang hoạt động và đã hết hạn.
+
+Thống kê: Theo dõi hiệu quả của từng mã giảm giá.
+-phân tích :
+Đây là phân tích chi tiết về luồng xử lý dữ liệu và logic hoạt động của chức năng Quản lý Khuyến mãi & Mã giảm giá, chia thành vai trò của Backend và Frontend.
+
+Phân Tích Logic Xử Lý Dữ Liệu và Hoạt Động
+Chức năng này xoay quanh việc quản lý đối tượng Mã Giảm Giá (Coupon/Promotion), bao gồm việc tạo mới, lưu trữ, kiểm tra tính hợp lệ và theo dõi hiệu suất.
+
+1. Cấu Trúc Dữ Liệu Cơ Bản (Logic Dữ Liệu)
+Đối tượng Mã Giảm Giá cần được lưu trữ trong cơ sở dữ liệu (ví dụ: Firestore Collection promotions hoặc coupons). Các trường dữ liệu chính bao gồm:
+
+Trường (Field)	Mô tả	Loại dữ liệu	Vai trò
+id	ID duy nhất của chương trình/mã giảm giá.	String	Khóa chính
+code	Mã code khách hàng nhập (ví dụ: TET2025).	String	Unique Index
+type	Loại giảm giá (percentage hoặc fixed_amount).	String	Định nghĩa logic tính toán
+value	Giá trị giảm (ví dụ: 15 cho 15% hoặc 50000 cho 50.000 VND).	Number	Giá trị áp dụng
+max_usage	Số lần tối đa mã có thể được sử dụng.	Number	Giới hạn toàn cầu
+current_usage	Số lần mã đã được sử dụng (thống kê).	Number	Tracking
+user_limit	Số lần tối đa một người dùng có thể sử dụng.	Number	Giới hạn cá nhân
+min_order_value	Giá trị đơn hàng tối thiểu để áp dụng.	Number	Điều kiện áp dụng
+start_date	Ngày bắt đầu hiệu lực.	Timestamp	Kiểm tra hiệu lực
+expiry_date	Ngày hết hạn.	Timestamp	Kiểm tra hiệu lực
+status	Trạng thái (active, expired, disabled).	String	Hiển thị và lọc
+
+Export to Sheets
+2. Luồng Hoạt Động (Workflow Logic)
+A. Tạo và Chỉnh sửa Mã giảm giá
+Bước	Mô tả	Vai trò thực hiện
+1. Nhập liệu	Frontend hiển thị form nhập liệu.	Frontend
+2. Gửi dữ liệu	Frontend gọi API (POST /promotions hoặc PUT /promotions/:id) gửi dữ liệu thô.	Frontend
+3. Xác thực	Backend kiểm tra tính hợp lệ (ví dụ: code không được trùng, value là số dương, expiry_date hợp lệ).	Backend
+4. Xử lý & Lưu trữ	Backend tạo hoặc cập nhật đối tượng Mã Giảm Giá trong DB. current_usage luôn được khởi tạo bằng 0.	Backend
+5. Phản hồi	Backend trả về trạng thái thành công/thất bại.	Backend
+6. Cập nhật UI	Frontend hiển thị thông báo thành công và làm mới danh sách.	Frontend
+
+Export to Sheets
+B. Áp dụng Mã giảm giá (Tác động từ Khách hàng)
+Đây là luồng quan trọng nhất xảy ra tại bước thanh toán:
+
+Bước	Mô tả	Vai trò thực hiện
+1. Yêu cầu	Khách hàng nhập code và nhấn áp dụng. Frontend gửi code, ID người dùng (nếu có), và tổng giá trị giỏ hàng lên Backend (POST /apply-coupon).	Frontend
+2. Tìm kiếm	Backend tìm kiếm Mã Giảm Giá theo code trong DB.	Backend
+3. Kiểm tra tính hợp lệ (Verification Logic)	Backend thực hiện loạt kiểm tra: <ul><li>Thời gian: start_date <= current_time <= expiry_date.</li><li>Giới hạn sử dụng toàn cầu: current_usage < max_usage.</li><li>Giá trị đơn hàng: current_order_value >= min_order_value.</li><li>Giới hạn người dùng: Kiểm tra lịch sử sử dụng của người dùng này (user_limit).</li></ul>	Backend
+4. Tính toán	Nếu hợp lệ, Backend tính toán số tiền giảm dựa trên type và value.	Backend
+5. Phản hồi	Backend trả về kết quả: số tiền giảm (thành công) hoặc lý do thất bại (hết hạn, không đủ điều kiện).	Backend
+6. Giao diện	Frontend hiển thị số tiền giảm và tổng số tiền phải trả mới.	Frontend
+
+Export to Sheets
+LƯU Ý QUAN TRỌNG: Việc cập nhật current_usage chỉ xảy ra tại thời điểm thanh toán thành công, không phải lúc khách hàng nhấn "Áp dụng".
+
+C. Thống kê và Danh sách
+Bước	Mô tả	Vai trò thực hiện
+1. Yêu cầu Danh sách	Frontend gọi API (GET /promotions).	Frontend
+2. Truy vấn	Backend truy vấn toàn bộ (hoặc theo bộ lọc/phân trang) dữ liệu từ Collection Mã Giảm Giá.	Backend
+3. Phân loại (Logic hiển thị)	Backend/Frontend dùng expiry_date và current_usage để phân loại: <ul><li>Đang hoạt động: Chưa hết hạn và chưa hết số lần sử dụng.</li><li>Đã hết hạn: Đã qua expiry_date.</li><li>Đã dùng hết: current_usage == max_usage.</li></ul>	Backend/Frontend
+4. Hiển thị Thống kê	Frontend hiển thị các trường current_usage, max_usage, và các chỉ số hiệu suất khác (doanh thu từ mã giảm giá này - cần logic Backend phức tạp hơn)	Frontend
+
+Export to Sheets
+Vai Trò Cụ Thể của Backend và Frontend
+Backend (Xử lý, Bảo mật, Dữ liệu)
+Backend chịu trách nhiệm về tất cả các logic nghiệp vụ quan trọng và tính toàn vẹn của dữ liệu.
+
+Quản lý CRUD (Create, Read, Update, Delete) Mã Giảm Giá:
+
+Xử lý API tạo, chỉnh sửa, xóa và lấy danh sách.
+
+Đảm bảo code là duy nhất trước khi tạo.
+
+Logic Xác Thực Mã Giảm Giá (Quan trọng nhất):
+
+Tạo một API riêng để xác thực và tính toán giảm giá (/apply-coupon).
+
+Thực hiện tất cả các kiểm tra điều kiện (ngày, giới hạn sử dụng, giá trị đơn hàng, giới hạn người dùng).
+
+Cập nhật Thống kê Sử dụng:
+
+Tại thời điểm xác nhận thanh toán thành công, Backend phải thực hiện giao dịch (Transaction) để tăng current_usage lên 1 và áp dụng số tiền giảm vào bản ghi đơn hàng.
+
+Hỗ trợ Thống kê Hiệu suất:
+
+Cung cấp các API để truy vấn tổng doanh thu đã giảm hoặc số lượng đơn hàng đã sử dụng Mã Giảm Giá đó.
+
+Frontend (Giao diện và Trải nghiệm người dùng)
+Frontend chịu trách nhiệm về trải nghiệm quản lý và hiển thị dữ liệu trực quan.
+
+Form Nhập liệu:
+
+Thiết kế giao diện thân thiện cho việc tạo/chỉnh sửa mã giảm giá (sử dụng Date Picker, input số cho phần trăm/giá trị).
+
+Hiển thị Danh sách và Lọc:
+
+Hiển thị danh sách mã giảm giá, bao gồm các cột như code, value, expiry_date, current_usage.
+
+Cung cấp các bộ lọc/chuyển đổi để xem Đang hoạt động, Đã hết hạn, Đã dùng hết.
+
+Hiển thị Thống kê:
+
+Sử dụng các biểu đồ (ví dụ: biểu đồ tròn hoặc thanh) để thể hiện tỉ lệ current_usage so với max_usage.
+
+Hiển thị các chỉ số hiệu suất chính (ví dụ: Tổng số tiền đã được giảm nhờ mã này).
+
+Tương tác API:
+
+Gửi yêu cầu tạo/cập nhật tới Backend và xử lý các phản hồi lỗi từ Backend để hiển thị thông báo thích hợp cho quản trị viên.
+
+làm lần lượt từ backend cho tới frontend 
+
+link A.I:  https://gemini.google.com/app/c0f7038e80d13eeb
+
+
+
+đã làm: 
+2. Quản lý người dùng ( done)
+Một trang quản lý người dùng riêng biệt sẽ giúp bạn dễ dàng kiểm soát tài khoản khách hàng, đặc biệt khi cần giải quyết các vấn đề liên quan đến đơn hàng hoặc thông tin cá nhân.
+
+Thông tin chi tiết: Xem danh sách tất cả người dùng, bao gồm tên, email và số điện thoại. ( xong)
+
+Lịch sử đơn hàng: Xem tất cả đơn hàng mà một người dùng cụ thể đã đặt. (xong)
+
+Chức năng quản lý: Cho phép bạn chỉnh sửa hoặc vô hiệu hóa tài khoản người dùng nếu cần. ( xong )
+
+1. Thống kê & Báo cáo (  )
+Trang này cung cấp cái nhìn tổng quan về hiệu suất của cửa hàng. Đây là một trang cực kỳ hữu ích cho việc ra quyết định kinh doanh.
+
+Doanh thu: Biểu đồ doanh thu theo ngày, tuần, tháng, và năm. ( ok )
+
+Sản phẩm bán chạy nhất: Liệt kê các món ăn được order nhiều nhất. ( ok )
+
+Khách hàng tiềm năng: Thống kê khách hàng order nhiều nhất. ( ok)
+
+Tình hình đơn hàng: Tỷ lệ đơn hàng đã hoàn thành, đang xử lý, hoặc đã hủy. ( ok )
+
+
+---------------- PHẢI LÀM ----------------:
+

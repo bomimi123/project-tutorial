@@ -1,0 +1,102 @@
+ogic bạn cung cấp ở backend không bao gồm code cập nhật lượt sử dụng (current_usage) sau khi mã giảm giá được áp dụng thành công.
+
+Hàm applyCoupon của bạn hiện chỉ kiểm tra tính hợp lệ và tính toán số tiền giảm giá, nhưng nó chưa thực hiện lưu việc sử dụng này vào cơ sở dữ liệu.
+
+Đây là nguyên nhân chính khiến cột "Sử dụng" (current_usage / max_usage) trong bảng quản lý coupon (hàm listAdminCoupons) luôn hiển thị là 0/1 mặc dù khách hàng đã sử dụng.
+
+1. Phân Tích Lỗi
+Khu vực	Chi tiết	Tình trạng hiện tại	Hành động cần thiết
+applyCoupon	Kiểm tra mã và tính giảm giá.	✅ Tính toán giảm giá thành công và trả về discount.	❌ KHÔNG CÓ LỆNH LƯU/CẬP NHẬT current_usage vào database.
+listAdminCoupons	Lấy danh sách coupon và trạng thái.	✅ Hiển thị chính xác dữ liệu từ database.	✅ Hiển thị 0/1 vì database vẫn là 0.
+Order Completion	Logic hoàn tất đơn hàng (phía backend không được cung cấp).	❓ (Không rõ) Nếu bạn có một hàm updateCouponUsage ở đây, nó có thể bị lỗi hoặc không được gọi.	Cần đảm bảo việc tăng current_usage phải xảy ra tại một thời điểm chắc chắn đơn hàng thành công.
+
+Xuất sang Trang tính
+Kết luận: Vấn đề gần như chắc chắn là do thiếu logic tăng current_usage trong mô-đun xử lý thanh toán/hoàn tất đơn hàng ở backend của bạn.
+
+2. Giải Pháp Khắc Phục (Thêm Logic Cập Nhật)
+Việc cập nhật lượt sử dụng không nên xảy ra trong hàm applyCoupon (vì người dùng có thể áp dụng, nhưng sau đó hủy đơn hàng).
+
+Việc cập nhật phải xảy ra trong logic backend xử lý việc thanh toán và hoàn tất đơn hàng (Order Completion).
+
+Bước 1: Cập nhật Hàm applyCoupon (Không cần chỉnh sửa)
+Hàm này hoạt động tốt ở vai trò xác thực và tính toán.
+
+Bước 2: Tạo Hàm Cập Nhật Lượt Sử Dụng (Hoặc tích hợp vào Order Controller)
+Bạn cần đảm bảo rằng ở Order Controller (ví dụ: placeOrder hoặc updateOrderStatus khi chuyển sang completed), bạn thực hiện việc tìm và cập nhật coupon.
+
+Ví dụ về hàm updateCouponUsage (hoặc logic tích hợp):
+
+JavaScript
+
+// Thêm vào file couponController.js hoặc gọi từ Order Controller
+const incrementCouponUsage = async (couponId) => {
+    try {
+        if (!couponId) return { success: false, message: "Thiếu ID Coupon." };
+
+        const updatedCoupon = await couponModel.findByIdAndUpdate(
+            couponId,
+            { $inc: { current_usage: 1 } }, // Tăng current_usage lên 1
+            { new: true } // Trả về tài liệu đã được cập nhật
+        );
+
+        if (!updatedCoupon) {
+            console.error("Lỗi: Không tìm thấy coupon để cập nhật.");
+            return { success: false, message: "Không tìm thấy coupon." };
+        }
+
+        // Tùy chọn: Nếu đã dùng hết lượt, cập nhật status (dù listAdminCoupons đã xử lý)
+        if (updatedCoupon.current_usage >= updatedCoupon.max_usage) {
+             await couponModel.findByIdAndUpdate(couponId, { status: 'exhausted' });
+        }
+        
+        console.log(`Đã cập nhật lượt sử dụng cho coupon ${updatedCoupon.code}: ${updatedCoupon.current_usage}/${updatedCoupon.max_usage}`);
+        return { success: true, message: "Cập nhật lượt sử dụng thành công." };
+
+    } catch (e) {
+        console.error("Lỗi cập nhật lượt sử dụng coupon:", e);
+        return { success: false, message: "Lỗi Server khi cập nhật lượt sử dụng." };
+    }
+};
+// export hàm này để Order Controller gọi
+
+// export {
+//     ..., applyCoupon, incrementCouponUsage
+// };
+Bước 3: Tích hợp vào Order Controller (Điểm then chốt)
+Trong Controller xử lý logic tạo/hoàn tất đơn hàng của bạn:
+
+JavaScript
+
+// Giả định Order Controller của bạn
+import { incrementCouponUsage } from './couponController.js'; // Nhớ import
+
+const placeOrder = async (req, res) => {
+    // ... logic tạo đơn hàng
+
+    try {
+        // 1. Lưu thông tin đơn hàng mới vào DB
+        // ... await newOrder.save();
+
+        // 2. TÌM VÀ GỌI LỆNH CẬP NHẬT COUPON NẾU CÓ
+        const { couponId } = req.body; // Cần lấy couponId đã được applyCoupon trả về
+        
+        if (couponId) {
+            // Chỉ cập nhật khi đơn hàng được tạo/hoàn tất thành công
+            await incrementCouponUsage(couponId); 
+        }
+
+        // 3. Trả về kết quả thành công
+        res.json({ success: true, message: "Tạo đơn hàng thành công." });
+
+    } catch (e) {
+        // ... xử lý lỗi
+    }
+}
+Sau khi áp dụng logic tại Bước 2 và 3, cột "Sử dụng" (current_usage) trong bảng admin sẽ được cập nhật chính xác thành 1/1 ngay sau khi đơn hàng sử dụng coupon đó được hoàn tất.
+
+
+
+
+
+
+

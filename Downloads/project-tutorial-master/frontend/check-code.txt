@@ -1,0 +1,337 @@
+import axios from 'axios';
+import React, { createContext, useEffect, useState, useRef } from 'react';
+import { toast } from 'react-toastify';
+
+export const StoreContext = createContext(null);
+
+// Key dùng để lưu đơn hàng đã thông báo
+const NOTIFICATION_KEY = 'order_completed_notifications';
+// Phí giao hàng cố định
+const DELIVERY_FEE = 2; 
+
+const StoreContextProvider = (props) => {
+    const [isScrollButtonVisible, setIsScrollButtonVisible] = useState(false);
+    const [cartItems, setCartItems] = useState({}); // {itemId: quantity}
+    const url = "http://localhost:4000";
+    const [token, setToken] = useState("");
+    const [food_list, setFoodList] = useState([]);
+
+    // ---------------- COUPON STATES (Cập nhật dựa trên code bạn gửi) ----------------
+    // Chúng ta không cần couponCode state ở đây, thay vào đó dùng:
+    const [appliedPromoCode, setAppliedPromoCode] = useState(''); // Mã đã áp dụng
+    // discount: { type: "percent" | "fixed" | null, value: number }
+    const [discountInfo, setDiscountInfo] = useState({ type: null, value: 0 }); // Thông tin giảm giá đã áp dụng
+
+    // Search (Navbar)
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const searchTimeoutRef = useRef(null);
+
+    // Order history
+    const [orderHistory, setOrderHistory] = useState([]);
+    const [orderLoading, setOrderLoading] = useState(true);
+    const [orderError, setOrderError] = useState('');
+    const [orderSearchQuery, setOrderSearchQuery] = useState('');
+    const [orderFilterStatus, setOrderFilterStatus] = useState('all');
+
+    // Lưu đơn hàng vừa Completed mà chưa thông báo
+    const [newlyCompletedOrders, setNewlyCompletedOrders] = useState([]);
+
+    // ---------------- CART & TOTALS ----------------
+    const addToCart = async (itemId) => {
+        setCartItems((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
+        if (token) {
+            await axios.post(url + "/api/cart/add", { itemId }, { headers: { token } });
+        }
+        // Khi thêm/bớt hàng, reset coupon
+        if(discountInfo.type !== null) {
+            setDiscountInfo({ type: null, value: 0 }); 
+            setAppliedPromoCode('');
+        }
+    };
+
+    const removeFromCart = async (itemId) => {
+        setCartItems((prev) => {
+            const newCount = (prev[itemId] || 0) - 1;
+            const newCartItems = { ...prev, [itemId]: newCount > 0 ? newCount : 0 };
+            if (newCount <= 0) delete newCartItems[itemId];
+            return newCartItems;
+        });
+        if (token) {
+            await axios.post(url + "/api/cart/remove", { itemId }, { headers: { token } });
+        }
+        // Khi thêm/bớt hàng, reset coupon
+        if(discountInfo.type !== null) {
+            setDiscountInfo({ type: null, value: 0 });
+            setAppliedPromoCode('');
+        }
+    };
+
+    // Hàm tính Subtotal (giống như getCartSubtotal trong code bạn gửi, nhưng lấy giá từ food_list)
+    const getCartSubtotal = () => {
+        let subtotal = 0;
+        for (const itemId in cartItems) {
+            if (cartItems[itemId] > 0) {
+                const itemInfo = food_list.find((product) => product._id === itemId);
+                if (itemInfo) {
+                    subtotal += itemInfo.price * cartItems[itemId];
+                }
+            }
+        }
+        return subtotal;
+    };
+    
+    // Hàm tính toán số tiền giảm giá (Áp dụng logic tính toán mới)
+    const getDiscountAmount = () => {
+        const subtotal = getCartSubtotal();
+        let discountAmount = 0;
+
+        if (discountInfo.type === "percent") {
+            // Giảm theo phần trăm
+            discountAmount = (subtotal * discountInfo.value) / 100;
+        } else if (discountInfo.type === "fixed") {
+            // Giảm cố định, không thể lớn hơn subtotal
+            discountAmount = Math.min(discountInfo.value, subtotal);
+        }
+        return discountAmount;
+    };
+
+    // Hàm tính toán Tổng tiền cuối cùng
+    const getFinalTotal = () => {
+        const subtotal = getCartSubtotal();
+        const discount = getDiscountAmount();
+        const deliveryFee = subtotal > 0 ? DELIVERY_FEE : 0; // Chỉ tính phí ship khi có hàng
+        
+        // Áp dụng giảm giá và cộng phí ship
+        return (subtotal - discount + deliveryFee);
+    };
+
+    // ---------------- COUPON LOGIC (Áp dụng logic applyPromoCode bạn gửi) ----------------
+    // Đổi tên từ applyCoupon sang applyPromoCode để phù hợp với code bạn gửi
+    const applyPromoCode = async (code) => {
+        const subtotal = getCartSubtotal();
+
+        if (subtotal === 0) {
+            return { success: false, message: "Giỏ hàng trống! Vui lòng thêm sản phẩm." };
+        }
+        if (!code || code.trim() === '') {
+            return { success: false, message: "Vui lòng nhập mã giảm giá." };
+        }
+
+        // Reset trạng thái giảm giá
+        setDiscountInfo({ type: null, value: 0 }); 
+        setAppliedPromoCode('');
+
+        try {
+            // Giả định API Backend để áp dụng coupon là /api/coupon/validate (theo code bạn gửi)
+            const response = await axios.post(url + "/api/coupon/validate", { code }, { headers: { token } });
+
+            if (response.data.success) {
+                const { discountType, discountValue } = response.data;
+                
+                // Lưu thông tin giảm giá đã áp dụng
+                setDiscountInfo({ type: discountType, value: discountValue });
+                setAppliedPromoCode(code);
+                
+                // Trả về kết quả để Cart.jsx hiển thị toast
+                return { success: true, message: "Áp dụng mã giảm giá thành công!" };
+            } else {
+                return { success: false, message: response.data.message || "Mã không hợp lệ hoặc đã hết hạn." };
+            }
+        } catch (error) {
+            console.error("Lỗi khi áp dụng promo code:", error);
+            // setDiscountInfo({ type: null, value: 0 }); // Không cần reset vì đã reset ở trên
+            return { success: false, message: "Lỗi kết nối khi kiểm tra mã giảm giá." };
+        }
+    };
+
+
+    // ---------------- FETCH DATA ----------------
+    const fetchFoodList = async () => {
+        try {
+            const response = await axios.get(url + "/api/food/list");
+            setFoodList(response.data.data);
+        } catch (error) {
+            console.error("Error fetching food list", error);
+        }
+    };
+
+    const loadCartData = async (token) => {
+        try {
+            const response = await axios.post(url + "/api/cart/get", {}, { headers: { token } });
+            setCartItems(response.data.cartData || {});
+        } catch (error) {
+            console.error("Error loading cart data", error);
+        }
+    };
+
+    // ---------------- SEARCH ----------------
+    const fetchSearchResults = async (query) => {
+        if (!query.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await axios.get(`${url}/api/food/search?q=${query}`);
+            if (response.data.success) {
+                setSearchResults(response.data.data);
+            } else {
+                setSearchResults([]);
+                console.error("Search API failed:", response.data.message);
+            }
+        } catch (error) {
+            setSearchResults([]);
+            console.error("Error fetching search results:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // ---------------- ORDERS ----------------
+    const fetchOrders = async () => {
+        setOrderLoading(true);
+        try {
+            const response = await axios.get(`${url}/api/order/userorders`, {
+                headers: { token },
+                params: { status: orderFilterStatus, search: orderSearchQuery }
+            });
+
+            if (response.data.success) {
+                const orders = response.data.data;
+
+                // Lấy danh sách đơn hàng đã được thông báo trước đó
+                const notifiedOrders = JSON.parse(localStorage.getItem(NOTIFICATION_KEY) || '{}');
+                const newCompleted = [];
+                const updatedNotified = { ...notifiedOrders };
+
+                orders.forEach(order => {
+                    const orderId = order._id;
+                    const isCompleted = order.status.toLowerCase() === "order completed".toLowerCase();
+
+                    if (isCompleted && !notifiedOrders[orderId]) {
+                        newCompleted.push(order);
+                        updatedNotified[orderId] = true;
+                    }
+                });
+
+                setOrderHistory(orders);
+                setNewlyCompletedOrders(newCompleted);
+                localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(updatedNotified));
+                setOrderError('');
+            } else {
+                toast.error(response.data.message);
+                setOrderError(response.data.message);
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Không thể lấy dữ liệu đơn hàng.");
+            setOrderError("Không thể lấy dữ liệu đơn hàng.");
+        } finally {
+            setOrderLoading(false);
+        }
+    };
+
+    // ---------------- EFFECTS ----------------
+    // Search effect
+    useEffect(() => {
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        if (searchQuery === '') {
+            setSearchResults([]);
+            setIsLoading(false);
+            return;
+        }
+
+        searchTimeoutRef.current = setTimeout(() => {
+            fetchSearchResults(searchQuery);
+        }, 300);
+
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [searchQuery]);
+
+    // Initial load
+    useEffect(() => {
+        async function loadData() {
+            await fetchFoodList();
+            const savedToken = localStorage.getItem("token");
+            if (savedToken) {
+                setToken(savedToken);
+                await loadCartData(savedToken);
+            }
+        }
+        loadData();
+    }, []);
+
+    // Fetch orders on changes
+    useEffect(() => {
+        if (token) {
+            fetchOrders();
+        }
+    }, [token, orderFilterStatus, orderSearchQuery]);
+
+    // Scroll button visibility
+    useEffect(() => {
+        const toggleScrollButtonVisibility = () => {
+            setIsScrollButtonVisible(window.pageYOffset > 1500);
+        };
+
+        window.addEventListener("scroll", toggleScrollButtonVisibility);
+        return () => {
+            window.removeEventListener("scroll", toggleScrollButtonVisibility);
+        };
+    }, []);
+
+    // ---------------- CONTEXT VALUE ----------------
+    const contextValue = {
+        food_list,
+        cartItems,
+        setCartItems,
+        addToCart,
+        removeFromCart,
+        isScrollButtonVisible,
+        url,
+        token,
+        setToken,
+        // Coupon Logic (Đã thay đổi)
+        getCartSubtotal, // Hàm mới tính subtotal
+        appliedPromoCode, // Mã đã được áp dụng
+        discountInfo, // Thông tin giảm giá
+        applyPromoCode, // Hàm áp dụng mã
+        getDiscountAmount,
+        getFinalTotal,
+        DELIVERY_FEE,
+        // search drop-down
+        searchQuery,
+        setSearchQuery,
+        searchResults,
+        isLoading,
+        setSearchResults,
+        // order history 
+        orderHistory,
+        orderLoading,
+        orderError,
+        orderSearchQuery,
+        setOrderSearchQuery,
+        orderFilterStatus,
+        setOrderFilterStatus,
+        newlyCompletedOrders,
+        setNewlyCompletedOrders
+    };
+
+    return (
+        <StoreContext.Provider value={contextValue}>
+            {props.children}
+        </StoreContext.Provider>
+    );
+};
+
+export default StoreContextProvider;

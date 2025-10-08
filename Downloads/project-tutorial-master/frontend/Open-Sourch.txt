@@ -1,0 +1,174 @@
+// phía frontend/navbar.jsx
+import React, { useContext, useState, useEffect, useRef } from 'react';
+import './Navbar.css';
+import { assets } from '../../assets/assets.js';
+import { Link, useNavigate } from 'react-router-dom';
+import { StoreContext } from '../../context/StoreContext.jsx';
+import axios from 'axios'; // Import axios
+// import Cart from '../../pages/Cart/Cart.jsx'; // Không cần import Cart ở đây
+
+const Navbar = ({ setShowLogin }) => {
+    const [menu, setMenu] = useState("home");
+    const { url, getTotalCartAmount, token, setToken } = useContext(StoreContext);
+    const navigate = useNavigate();
+    
+    // NEW STATES CHO TÌM KIẾM LIVE
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const searchTimeoutRef = useRef(null); // Ref để giữ bộ đếm debounce
+    const searchBarRef = useRef(null); // Ref cho thanh tìm kiếm và dropdown
+
+    const logout = () => {
+        localStorage.removeItem("token");
+        setToken("");
+        navigate("/");
+    }
+
+    // NEW: Hàm gọi API tìm kiếm
+    const fetchSearchResults = async (query) => {
+        if (!query.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await axios.get(`${url}/api/food/search?q=${query}`);
+            
+            if (response.data.success) {
+                setSearchResults(response.data.data);
+            } else {
+                setSearchResults([]);
+                console.error("Search API failed:", response.data.message);
+            }
+        } catch (error) {
+            setSearchResults([]);
+            console.error("Error fetching search results:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // NEW: Logic Debounce và gọi API
+    useEffect(() => {
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        if (searchQuery === '') {
+            setSearchResults([]);
+            setIsLoading(false);
+            return;
+        }
+
+        searchTimeoutRef.current = setTimeout(() => {
+            fetchSearchResults(searchQuery);
+        }, 300); // 300ms debounce
+
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [searchQuery]);
+
+    // NEW: Xử lý đóng dropdown khi click ra ngoài
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (searchBarRef.current && !searchBarRef.current.contains(event.target)) {
+                // Đóng dropdown
+                setSearchQuery('');
+                setSearchResults([]);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    const handleItemClick = () => {
+        // Reset trạng thái tìm kiếm khi người dùng chọn một món ăn
+        setSearchQuery(''); 
+        setSearchResults([]);
+    };
+
+
+    return (
+        <div className='navbar'>
+            <Link to='/'><img src={assets.logo} alt="Logo" className='logo' /></Link>
+            <ul className='navbar-menu'>
+                <Link to="/" onClick={() => setMenu("home")} className={menu === "home" ? "active" : ""}>Home</Link>
+                <Link to="/cart" onClick={() => setMenu("cart")} className={menu === "cart" ? "active" : ""}>Cart</Link>
+                <Link to="/order-history" onClick={() => setMenu("order-history")} className={menu === "order-history" ? "active" : ""}>Order History</Link>
+                <Link to='/contact-us' onClick={() => setMenu("contact-us")} className={menu === "contact-us" ? "active" : ""}>Contact Us</Link>
+                <Link to='/about-us' onClick={() => setMenu("about-us")} className={menu === "about-us" ? "active" : ""}>About Us</Link>
+            </ul>
+            <div className="navbar-right">
+
+                {/* NEW: THANH TÌM KIẾM VÀ DROPDOWN KẾT QUẢ */}
+                <div className="navbar-search-bar" ref={searchBarRef}>
+                    <div className='navbar-search-input'>
+                        <input 
+                            type="text" 
+                            placeholder='Tìm kiếm món ăn...' 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <img src={assets.search_icon} alt="Search Icon" />
+                    </div>
+
+                    {/* DROPDOWN HIỂN THỊ KẾT QUẢ */}
+                    {(searchQuery.length > 0) && (
+                        <div className="navbar-search-dropdown">
+                            {isLoading && <p className="loading-spinner">Đang tải...</p>}
+                            
+                            {!isLoading && searchResults.length > 0 ? (
+                                searchResults.map((item) => (
+                                    <Link 
+                                        to={`/food/${item._id}`} // Thay đổi tùy theo route chi tiết sản phẩm của bạn
+                                        key={item._id} 
+                                        className="dropdown-item"
+                                        onClick={handleItemClick} // Xử lý đóng dropdown khi click
+                                    >
+                                        {/* Lưu ý: Đảm bảo đường dẫn ảnh chính xác */}
+                                        <img src={url+"/images/"+item.image} alt={item.name} />
+                                        <div className="item-info">
+                                            <p className="item-name">{item.name}</p>
+                                            <p className="item-price">${item.price}</p>
+                                        </div>
+                                    </Link>
+                                ))
+                            ) : !isLoading && searchQuery.length > 0 && (
+                                <p className="no-results">Không tìm thấy món ăn nào khớp với "{searchQuery}"</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+                {/* END: THANH TÌM KIẾM */}
+
+                <div className="navbar-search-icon">
+                    <Link to='/cart'><img src={assets.basket_icon} alt="Basket Icon" /></Link>
+                    <div className={getTotalCartAmount() === 0 ? "" : "dot"}>
+                    
+                    </div>
+                </div>
+                {!token ? <button onClick={() => setShowLogin(true)} type='submit'>Sign in</button>
+                    : <div className='navbar-profile'>
+                        <img src={assets.profile_icon} alt="" />
+                        <ul className='nav-profile-dropdown'>
+                            <li onClick={() => navigate('/myorder')}><img src={assets.bag_icon} alt="" /><p>My Orders</p></li>
+                            <hr />
+                            <li onClick={logout}><img src={assets.logout_icon} alt="" /><p>Logout</p></li>
+                        </ul>
+                    </div>
+                }
+            </div>
+        </div>
+    );
+}
+
+export default Navbar;
